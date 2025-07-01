@@ -1,5 +1,9 @@
+from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import User
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
 
 # Create your models here.
 class Course(models.Model):
@@ -61,12 +65,51 @@ class Comment(models.Model):
     content_id = models.ForeignKey(CourseContent, verbose_name="konten", on_delete=models.CASCADE)
     member_id = models.ForeignKey(CourseMember, verbose_name="pengguna", on_delete=models.CASCADE)
     comment = models.TextField('komentar')
+    is_approved = models.BooleanField("Disetujui", default=False)  # ✅ Tambahkan ini
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         verbose_name = "Komentar"
         verbose_name_plural = "Komentar"
 
     def __str__(self) -> str:
-        return "Komen: "+self.member_id.user_id+"-"+self.comment
+        return f"Komen: {self.member_id.user_id}-{self.comment}"
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+    handphone = models.CharField("No HP", max_length=20, blank=True)
+    deskripsi = models.TextField("Deskripsi", blank=True)
+    foto_profil = models.ImageField(upload_to="foto_profil/", null=True, blank=True)
+
+    objects = models.Manager()
+
+    def __str__(self):
+        return f"Profil: {self.user.username}"
+
+class CourseAnnouncement(models.Model):
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="announcements")
+    title = models.CharField("Judul", max_length=255)
+    message = models.TextField("Pesan")
+    show_at = models.DateField("Tampilkan Pada")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-show_at"]
+
+    def __str__(self):
+        return f"{self.title} ({self.course.name})"
+
+class CourseFeedback(models.Model):
+    course = models.ForeignKey("Course", on_delete=models.CASCADE, related_name="feedbacks")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+@receiver(post_save, sender=User)
+def create_user_profile(sender, instance, created, **kwargs):
+    if created:
+        UserProfile.objects.create(user=instance)

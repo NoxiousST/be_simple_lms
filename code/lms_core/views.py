@@ -1,11 +1,13 @@
-from django.shortcuts import render, HttpResponse
+from django.shortcuts import render, HttpResponse, get_object_or_404
 from django.http import JsonResponse
-from lms_core.models import Course
+
+from lms_core.models import Course, CourseMember
 from django.core import serializers
 from django.contrib.auth.models import User
 
+
 def index(request):
-    return HttpResponse("<h1>Hello World</h1>")
+    return HttpResponse("<h1>Hello Worlds</h1>")
     
 def testing(request):
     dataCourse = Course.objects.all()

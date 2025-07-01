@@ -74,7 +74,7 @@ def batch_enroll_students(request, course_id: int, payload: BatchEnrollSchema):
 
             _, created = CourseMember.objects.get_or_create(
                 course_id=course,
-                user_id=student_id,
+                user_id=User.objects.filter(id=student_id).first(),
                 defaults={"roles": "std"}
             )
             if created:
@@ -232,8 +232,13 @@ def edit_profile(request, payload: UserProfileIn):
 #########################################################
 
 def to_announcement_out(a: CourseAnnouncement) -> AnnouncementOut:
+    # Get all model fields except 'course' and 'created_at'
+    fields = {f.name: getattr(a, f.name)
+              for f in a._meta.fields
+              if f.name not in ['course', 'created_at']}
+
     return AnnouncementOut(
-        **{f.name: getattr(a, f.name) for f in a._meta.fields if f.name != 'course'},
+        **fields,
         course_id=a.course_id,
         created_at=a.created_at.isoformat()
     )
@@ -306,7 +311,14 @@ def add_feedback(request, course_id: int, payload: FeedbackIn):
             user=User.objects.get(id=request.user.id),
             message=payload.message
         )
-        return 201, FeedbackOut.from_orm(feedback)  # Use Django Ninja's ORM conversion
+        return 201, {
+            "id": feedback.id,
+            "course_id": course.id,
+            "user_id": request.user.id,
+            "message": feedback.message,
+            "created_at": feedback.created_at,
+            "updated_at": feedback.updated_at,
+        }
 
     except Course.DoesNotExist:
         raise HttpError(404, "Course not found")
@@ -314,22 +326,40 @@ def add_feedback(request, course_id: int, payload: FeedbackIn):
 # [Endpoint] Show Feedback
 @apiv1.get("/courses/{course_id}/feedback", response=list[FeedbackOut])
 def show_feedback(request, course_id: int):
-    return FeedbackOut.from_queryset(CourseFeedback.objects.filter(course_id=course_id))
+    queryset = CourseFeedback.objects.filter(course_id=course_id)
+    return [
+        FeedbackOut(
+            id=f.id,
+            course_id=f.course_id,
+            user_id=f.user_id,
+            message=f.message,
+            created_at=f.created_at,
+            updated_at=f.updated_at,
+        ) for f in queryset
+    ]
 
 # [Endpoint] Edit Feedback
 @apiv1.put("/feedback/{feedback_id}", auth=apiAuth, response={200: FeedbackOut, 403: dict, 404: dict})
 def edit_feedback(request, feedback_id: int, payload: FeedbackIn):
     try:
         feedback = CourseFeedback.objects.get(id=feedback_id)
-        if feedback.user.id != request.user.id:
-            raise HttpError(403, "Unauthorized to edit feedback")
-
-        feedback.message = payload.message
-        feedback.save()
-        return FeedbackOut.from_orm(feedback)
-
     except CourseFeedback.DoesNotExist:
-        raise HttpError(404, "Feedback not found")
+        return 404, {"error": "Feedback not found"}
+
+    if feedback.user_id != request.user.id:
+        return 403, {"error": "You are not authorized to edit this feedback"}
+
+    feedback.message = payload.message
+    feedback.save()
+
+    return 200, FeedbackOut(
+        id=feedback.id,
+        course_id=feedback.course_id,
+        user_id=feedback.user_id,
+        message=feedback.message,
+        created_at=feedback.created_at,
+        updated_at=feedback.updated_at,
+    )
 
 # [Endpoint] Delete Feedback
 @apiv1.delete("/feedback/{feedback_id}", auth=apiAuth, response={200: dict, 403: dict, 404: dict})

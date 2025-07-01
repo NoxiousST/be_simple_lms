@@ -65,7 +65,7 @@ class Comment(models.Model):
     content_id = models.ForeignKey(CourseContent, verbose_name="konten", on_delete=models.CASCADE)
     member_id = models.ForeignKey(CourseMember, verbose_name="pengguna", on_delete=models.CASCADE)
     comment = models.TextField('komentar')
-    is_approved = models.BooleanField("Disetujui", default=False)  # ✅ Tambahkan ini
+    is_approved = models.BooleanField("Disetujui", default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -81,8 +81,6 @@ class UserProfile(models.Model):
     handphone = models.CharField("No HP", max_length=20, blank=True)
     deskripsi = models.TextField("Deskripsi", blank=True)
     foto_profil = models.ImageField(upload_to="foto_profil/", null=True, blank=True)
-
-    objects = models.Manager()
 
     def __str__(self):
         return f"Profil: {self.user.username}"

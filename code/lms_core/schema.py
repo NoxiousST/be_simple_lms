@@ -121,7 +121,7 @@ class AnnouncementIn(BaseModel):
     message: str
     show_at: date
 
-class AnnouncementOut(BaseModel):
+class AnnouncementOut(Schema):
     id: int
     course_id: int
     title: str
